@@ -1,0 +1,7 @@
+.next
+bs
+.merlin
+lib/
+*.bs.js
+.bsb.lock
+node_modules/
