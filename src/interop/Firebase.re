@@ -22,27 +22,28 @@ module Auth = {
     code: string,
     message: string,
   };
-  type errorCallback = error => unit;
-  type successCallback = Js.nullable(User.t) => unit;
   type unsubscribe = unit => unit;
   type _userCredentials = {user: Js.nullable(User.t)};
   type userCredentials = {user: option(User.t)};
 
   [@bs.send]
-  external _onAuthStateChanged: (t, successCallback) => unsubscribe =
-    "onAuthStateChanged";
-
-  [@bs.send]
-  external _onAuthStateChangedWithError:
-    (t, successCallback, errorCallback) => unsubscribe =
+  external _onAuthStateChanged:
+    (
+      t,
+      ~success: Js.nullable(User.t) => unit,
+      ~error: error => unit=?,
+      unit
+    ) =>
+    unsubscribe =
     "onAuthStateChanged";
 
   let subscribeAuthState = (success, error, auth) => {
-    let optionizedSuccess = user => Js.Nullable.toOption(user) |> success;
+    let onSuccess = user => Js.Nullable.toOption(user) |> success;
 
     switch (error) {
-    | Some(e) => _onAuthStateChangedWithError(auth, optionizedSuccess, e)
-    | None => _onAuthStateChanged(auth, optionizedSuccess)
+    | Some(onError) =>
+      _onAuthStateChanged(auth, ~success=onSuccess, ~error=onError, ())
+    | None => _onAuthStateChanged(auth, ~success=onSuccess, ())
     };
   };
 
@@ -60,6 +61,75 @@ module Auth = {
   [@bs.send] external signOut: t => Promise.t(unit) = "signOut";
 };
 
+module Firestore = {
+  type t;
+
+  type collectionRef
+  and docRef;
+
+  type querySnapshot = {
+    docs: array(documentSnapshot),
+    size: int,
+    empty: bool,
+  }
+  and documentSnapshot = {
+    id: string,
+    exists: bool,
+    ref: docRef,
+  };
+
+  module Collection = {
+    type t = collectionRef;
+
+    [@bs.send] external doc: (t, string) => docRef = "doc";
+
+    [@bs.send] external get: t => Promise.t(querySnapshot) = "get";
+
+    [@bs.send]
+    external onSnapshot:
+      (t, querySnapshot => unit, ~error: Js.Exn.t => unit=?, unit) => unit =
+      "onSnapshot";
+
+    // queries
+    [@bs.send]
+    external orderBy: (t, string, [@bs.string] [ | `desc | `asc]) => t =
+      "orderBy";
+
+    [@bs.send] external limit: (t, int) => t = "limit";
+
+    [@bs.send] external startAt: (t, docRef) => t = "startAt";
+    [@bs.send] external startAfter: (t, docRef) => t = "startAfter";
+
+    [@bs.send] external endBefore: (t, docRef) => t = "endBefore";
+    [@bs.send] external endAt: (t, docRef) => t = "endAt";
+  };
+
+  module Doc = {
+    type t = docRef;
+
+    [@bs.send] external collection: (t, string) => Collection.t = "collection";
+
+    [@bs.send] [@bs.return nullable]
+    external getData: documentSnapshot => option(Js.Json.t) = "getData";
+
+    [@bs.send]
+    external onSnapshot:
+      (t, documentSnapshot => unit, ~error: Js.Exn.t => unit=?, unit) => unit =
+      "onSnapshot";
+  };
+
+  [@bs.send] external collection: (t, string) => Collection.t = "collection";
+  [@bs.send] external doc: (t, string) => Doc.t = "doc";
+
+  // CRUD
+  [@bs.send]
+  external get: t => Promise.Js.t(documentSnapshot, Js.Exn.t) = "get";
+  [@bs.send] external delete: t => Promise.Js.t(unit, Js.Exn.t) = "delete";
+  [@bs.send] external set: ('a, t) => Promise.Js.t(unit, Js.Exn.t) = "set";
+  [@bs.send]
+  external update: ('a, t) => Promise.Js.t(unit, Js.Exn.t) = "update";
+};
+
 module App = {
   type t;
   type options = {
@@ -74,6 +144,7 @@ module App = {
   [@bs.val] [@bs.module "firebase"] external apps: array(t) = "apps";
 
   [@bs.send] external authInstance: t => Auth.t = "auth";
+  [@bs.send] external firestoreInstance: t => Firestore.t = "firestore";
 
   let getInstance = () =>
     Belt.Array.get(apps, 0)
