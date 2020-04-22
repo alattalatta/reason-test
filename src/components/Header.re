@@ -19,7 +19,7 @@ let make = () => {
       onClick={_ => dispatch(Option.isSome(state.user) ? SignOut : SignIn)}>
       {React.string(
          switch (state.status) {
-         | Pending => "..."
+         | Pending => {j|기다려주세요...|j}
          | SignedIn => {j|로그아웃|j}
          | _ => {j|로그인|j}
          },

@@ -7,10 +7,11 @@
     }
   ],
   "bs-dependencies": [
+    "@glennsl/bs-json",
     "bs-css",
     "bs-css-emotion",
     "bs-fetch",
-    "@glennsl/bs-json",
+    "bs-webapi",
     "reason-promise",
     "reason-react"
   ],

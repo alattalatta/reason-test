@@ -1,3 +1,4 @@
+open Belt;
 [@react.component]
 let make = () => {
   let authStore = Hooks.Auth.useAuth();
@@ -18,11 +19,11 @@ let make = () => {
            </header>
            <ul>
              {myRooms
-              |> Array.map(room => <strong> {React.string(room)} </strong>)
-              |> Array.mapi((idx, el) =>
+              ->Array.map(room => <strong> {React.string(room)} </strong>)
+              ->Array.mapWithIndex((idx, el) =>
                    <li key={string_of_int(idx)}> el </li>
                  )
-              |> React.array}
+              ->React.array}
            </ul>
          </section>;
        } else {

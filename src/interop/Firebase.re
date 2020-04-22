@@ -1,3 +1,5 @@
+open Belt;
+
 %bs.raw
 {|import 'firebase/auth'|};
 
@@ -64,26 +66,34 @@ module Auth = {
 module Firestore = {
   type t;
 
-  type collectionRef
-  and docRef;
+  type collectionReference;
 
-  type querySnapshot = {
-    docs: array(documentSnapshot),
-    size: int,
-    empty: bool,
-  }
-  and documentSnapshot = {
+  type documentReference;
+
+  type documentSnapshot = {
     id: string,
     exists: bool,
-    ref: docRef,
+    ref: documentReference,
   };
 
-  module Collection = {
-    type t = collectionRef;
+  type queryDocumentSnapshot = {
+    id: string,
+    ref: documentReference,
+  };
 
-    [@bs.send] external doc: (t, string) => docRef = "doc";
+  type query;
 
-    [@bs.send] external get: t => Promise.t(querySnapshot) = "get";
+  type querySnapshot = {
+    docs: array(queryDocumentSnapshot),
+    size: int,
+    empty: bool,
+  };
+
+  module Query = {
+    type t = query;
+
+    [@bs.send] external _get: t => Promise.t(querySnapshot) = "get";
+    let get = query => _get(query)->Promise.Js.toResult;
 
     [@bs.send]
     external onSnapshot:
@@ -97,37 +107,141 @@ module Firestore = {
 
     [@bs.send] external limit: (t, int) => t = "limit";
 
-    [@bs.send] external startAt: (t, docRef) => t = "startAt";
-    [@bs.send] external startAfter: (t, docRef) => t = "startAfter";
+    [@bs.send] external startAt: (t, documentReference) => t = "startAt";
+    [@bs.send] external startAfter: (t, documentReference) => t = "startAfter";
 
-    [@bs.send] external endBefore: (t, docRef) => t = "endBefore";
-    [@bs.send] external endAt: (t, docRef) => t = "endAt";
+    [@bs.send] external endBefore: (t, documentReference) => t = "endBefore";
+    [@bs.send] external endAt: (t, documentReference) => t = "endAt";
+
+    [@bs.send]
+    external where:
+      (
+        t,
+        string,
+        [@bs.string] [
+          | [@bs.as "<"] `lt
+          | [@bs.as "<="] `lte
+          | [@bs.as "=="] `eq
+          | [@bs.as ">="] `gte
+          | [@bs.as ">"] `gt
+        ],
+        'a
+      ) =>
+      t =
+      "where";
+
+    module Snapshot = {
+      type t = querySnapshot;
+
+      [@bs.get] external getQuery: t => query = "query";
+
+      [@bs.get] external size: t => int = "size";
+
+      [@bs.get] external isEmpty: t => bool = "empty";
+    };
   };
 
-  module Doc = {
-    type t = docRef;
+  module Reference = {
+    module type ReferenceBase = {type t;};
+
+    module Make = (M: ReferenceBase) => {
+      type t = M.t;
+      [@bs.get] external getID: M.t => string = "id";
+      [@bs.get] external getPath: M.t => string = "path";
+    };
+  };
+
+  module Collection = {
+    include Reference.Make({
+      type t = collectionReference;
+    });
+
+    [@bs.get] [@bs.return nullable]
+    external getParent: t => option(documentReference) = "parent";
+
+    [@bs.send]
+    external _add: (t, Js.Json.t) => Promise.Js.t(documentReference, Js.Exn.t) =
+      "add";
+    let add = (collection, data) =>
+      _add(collection, data)->Promise.Js.toResult;
+
+    [@bs.send] external doc: (t, string) => documentReference = "doc";
+
+    external asQuery: t => Query.t = "%identity";
+  };
+
+  module Document = {
+    include Reference.Make({
+      type t = documentReference;
+    });
+
+    [@bs.get] external getParent: t => collectionReference = "parent";
 
     [@bs.send] external collection: (t, string) => Collection.t = "collection";
-
-    [@bs.send] [@bs.return nullable]
-    external getData: documentSnapshot => option(Js.Json.t) = "getData";
 
     [@bs.send]
     external onSnapshot:
       (t, documentSnapshot => unit, ~error: Js.Exn.t => unit=?, unit) => unit =
       "onSnapshot";
+
+    // CRUD
+    [@bs.send]
+    external _get: t => Promise.Js.t(documentSnapshot, Js.Exn.t) = "get";
+    let get = document => _get(document)->Promise.Js.toResult;
+
+    /**
+   * Writes to the document referred to by this `DocumentReference`. If the
+   * document does not yet exist, it will be created. If you pass
+   * `SetOptions`, the provided data can be merged into an existing document.
+   *
+   * * `data` A map of the fields and values for the document.
+   * * `options` An object to configure the set behavior.
+   *
+   * Returns a Promise resolved once the data has been successfully written
+   * to the backend (Note that it won't resolve while you're offline).
+   */
+    [@bs.send]
+    external _set: (t, 'a) => Promise.Js.t(unit, Js.Exn.t) = "set";
+    let set = (document, data) => _set(document, data)->Promise.Js.toResult;
+
+    /**
+   * Updates fields in the document referred to by this `DocumentReference`.
+   * The update will fail if applied to a document that does not exist.
+   *
+   * * `data` An object containing the fields and values with which to
+   * update the document. Fields can contain dots to reference nested fields
+   * within the document.
+   *
+   * Return a Promise resolved once the data has been successfully written
+   * to the backend (Note that it won't resolve while you're offline).
+   */
+    [@bs.send]
+    external _update: (t, 'a) => Promise.Js.t(unit, Js.Exn.t) = "update";
+    let update = (document, data) =>
+      _update(document, data)->Promise.Js.toResult;
+
+    [@bs.send] external _delete: t => Promise.Js.t(unit, Js.Exn.t) = "delete";
+    let delete = document => _delete(document)->Promise.Js.toResult;
+
+    module Snapshot = {
+      type t = documentSnapshot;
+
+      [@bs.send] [@bs.return nullable]
+      external getData: t => option(Js.Json.t) = "data";
+    };
+
+    module QuerySnapshot = {
+      type t = queryDocumentSnapshot;
+
+      [@bs.send] external getData: t => Js.Json.t = "data";
+    };
   };
 
   [@bs.send] external collection: (t, string) => Collection.t = "collection";
-  [@bs.send] external doc: (t, string) => Doc.t = "doc";
 
-  // CRUD
-  [@bs.send]
-  external get: t => Promise.Js.t(documentSnapshot, Js.Exn.t) = "get";
-  [@bs.send] external delete: t => Promise.Js.t(unit, Js.Exn.t) = "delete";
-  [@bs.send] external set: ('a, t) => Promise.Js.t(unit, Js.Exn.t) = "set";
-  [@bs.send]
-  external update: ('a, t) => Promise.Js.t(unit, Js.Exn.t) = "update";
+  [@bs.send] external doc: (t, string) => Document.t = "doc";
+
+  [@bs.send] external query: (t, string) => Query.t = "collection";
 };
 
 module App = {
@@ -147,9 +261,9 @@ module App = {
   [@bs.send] external firestoreInstance: t => Firestore.t = "firestore";
 
   let getInstance = () =>
-    Belt.Array.get(apps, 0)
-    ->Belt.Option.map((app, ()) => app)
-    ->Belt.Option.getWithDefault(() =>
+    apps[0]
+    ->Option.map((app, ()) => app) // thunk for lazyness
+    ->Option.getWithDefault(() =>
         _initializeApp({
           apiKey: "AIzaSyCKLD787gEI3PE5wcuLQTU92eDB1GYiedk",
           authDomain: "yatarbucks.firebaseapp.com",
