@@ -5,7 +5,7 @@ module Type = {
 module Decode = {
   open Type;
 
-  let data = v => Json.Decode.{ticking: v |> field("somewhat", string)};
+  let data = v => Json.Decode.{ticking: field("somewhat", string, v)};
 };
 
 module Encode = {
