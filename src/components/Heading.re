@@ -6,7 +6,7 @@ module Styles = {
       borderBottom(`px(1), `solid, `hex("2e2e2e")),
       fontSize(`px(18)),
       fontWeight(`num(700)),
-      paddingBottom(`px(14)),
+      paddingBottom(`px(17)),
     ]);
 };
 

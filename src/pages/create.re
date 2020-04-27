@@ -4,17 +4,15 @@ type props = {rooms: array(int)};
 let make = () => {
   let (title, setTitle) = React.useState(() => "");
 
-  <div>
+  <Layout>
     <h1> {React.string(title)} </h1>
     <form>
       <input
         value=title
-        onChange={event =>
-          setTitle(_ => ReactEvent.Form.target(event)##value)
-        }
+        onChange={event => ReactEvent.Form.target(event)##value->setTitle}
       />
     </form>
-  </div>;
+  </Layout>;
 };
 
 let default = make;
